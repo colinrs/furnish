@@ -1,0 +1,45 @@
+# 用 depguard 守住 DDD 的依赖规则。Go 的 internal/ 只能挡住模块外部,
+# 挡不住 internal/ordering 和 internal/inventory 互相 import,所以需要这条检查。
+linters:
+  enable:
+    - depguard
+
+linters-settings:
+  depguard:
+    rules:
+      domain-is-pure:
+        files:
+          - "**/internal/*/domain/**"
+        deny:
+          - pkg: "gorm.io"
+            desc: "领域层不能依赖 ORM"
+          - pkg: "github.com/redis"
+            desc: "领域层不能依赖 Redis"
+          - pkg: "net/http"
+            desc: "领域层不能依赖 HTTP"
+          - pkg: "github.com/example/furnish/internal/platform"
+            desc: "领域层不能依赖基础设施"
+      app-has-no-infra:
+        files:
+          - "**/internal/*/app/**"
+        deny:
+          - pkg: "gorm.io"
+            desc: "应用层通过端口(接口)访问基础设施"
+          - pkg: "github.com/redis"
+            desc: "应用层通过端口(接口)访问基础设施"
+      inventory-only-sees-ordering-contract:
+        files:
+          - "**/internal/inventory/**"
+        deny:
+          - pkg: "github.com/example/furnish/internal/ordering/domain"
+            desc: "跨上下文只能依赖 ordering/contract"
+          - pkg: "github.com/example/furnish/internal/ordering/app"
+            desc: "跨上下文只能依赖 ordering/contract"
+          - pkg: "github.com/example/furnish/internal/ordering/adapter"
+            desc: "跨上下文只能依赖 ordering/contract"
+      ordering-does-not-see-inventory:
+        files:
+          - "**/internal/ordering/**"
+        deny:
+          - pkg: "github.com/example/furnish/internal/inventory"
+            desc: "下单上下文不直接依赖库存上下文,通过事件协作"
